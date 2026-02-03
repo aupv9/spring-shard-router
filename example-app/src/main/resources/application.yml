@@ -1,0 +1,59 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: payment-service
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+# Sharding configuration
+sharding:
+  enabled: true
+  strategy: HASH
+  shards:
+    - name: shard-0
+      datasource:
+        jdbc-url: jdbc:postgresql://pgbouncer-0:6432/payment_db
+        username: payment_user
+        password: payment_pass
+        maximum-pool-size: 20
+        minimum-idle: 5
+        connection-timeout: 30000
+        idle-timeout: 600000
+        max-lifetime: 1800000
+    - name: shard-1
+      datasource:
+        jdbc-url: jdbc:postgresql://pgbouncer-1:6432/payment_db
+        username: payment_user
+        password: payment_pass
+        maximum-pool-size: 20
+        minimum-idle: 5
+        connection-timeout: 30000
+        idle-timeout: 600000
+        max-lifetime: 1800000
+    - name: shard-2
+      datasource:
+        jdbc-url: jdbc:postgresql://pgbouncer-2:6432/payment_db
+        username: payment_user
+        password: payment_pass
+        maximum-pool-size: 20
+        minimum-idle: 5
+        connection-timeout: 30000
+        idle-timeout: 600000
+        max-lifetime: 1800000
+  # VIP account overrides (optional)
+  overrides:
+    10001: 0  # VIP account always goes to shard-0
+    10002: 0  # Another VIP account
+
+logging:
+  level:
+    org.springframework.boot.starter.sharding: DEBUG
+    com.zaxxer.hikari: INFO

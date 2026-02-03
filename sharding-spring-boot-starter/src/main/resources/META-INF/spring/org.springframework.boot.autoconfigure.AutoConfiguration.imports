@@ -1,0 +1,2 @@
+org.springframework.boot.starter.sharding.autoconfigure.ShardingAutoConfiguration
+org.springframework.boot.starter.sharding.autoconfigure.ShardingJpaAutoConfiguration

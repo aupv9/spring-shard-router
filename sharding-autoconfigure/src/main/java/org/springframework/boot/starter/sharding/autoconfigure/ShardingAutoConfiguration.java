@@ -106,50 +106,64 @@ public class ShardingAutoConfiguration {
     }
     
     /**
-     * Create individual shard data sources and wrap them in Shard objects
+     * Create individual shard data sources and wrap them in Shard objects.
+     * If a shard config contains read-replica entries, builds them too.
      */
     private List<Shard> createShards(ShardProperties properties) {
         List<ShardProperties.ShardConfig> shardConfigs = properties.getShards();
         if (shardConfigs.isEmpty()) {
             throw new IllegalArgumentException("At least one shard must be configured");
         }
-        
+
         List<Shard> shards = new ArrayList<>();
         for (int i = 0; i < shardConfigs.size(); i++) {
             ShardProperties.ShardConfig config = shardConfigs.get(i);
-            DataSource dataSource = createDataSource(config);
-            shards.add(Shard.of(config.getName(), i, dataSource));
+            DataSource primaryDataSource = createDataSource(config.getDatasource(),
+                "shard-" + config.getName());
+
+            List<ShardProperties.DataSourceConfig> replicaConfigs = config.getReadReplicas();
+            if (replicaConfigs.isEmpty()) {
+                shards.add(Shard.of(config.getName(), i, primaryDataSource));
+            } else {
+                List<DataSource> replicas = new ArrayList<>();
+                for (int r = 0; r < replicaConfigs.size(); r++) {
+                    replicas.add(createDataSource(replicaConfigs.get(r),
+                        "shard-" + config.getName() + "-replica-" + r));
+                }
+                shards.add(Shard.withReplicas(config.getName(), i, primaryDataSource, replicas));
+            }
         }
-        
+
         return shards;
     }
     
     /**
-     * Create HikariCP data source for individual shard
+     * Create HikariCP data source for a shard or replica.
+     *
+     * @param dsConfig the datasource configuration
+     * @param poolName pool name for HikariCP monitoring
      */
-    private DataSource createDataSource(ShardProperties.ShardConfig shardConfig) {
-        ShardProperties.DataSourceConfig dsConfig = shardConfig.getDatasource();
-        
+    DataSource createDataSource(ShardProperties.DataSourceConfig dsConfig, String poolName) {
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl(dsConfig.getJdbcUrl());
         config.setUsername(dsConfig.getUsername());
         config.setPassword(dsConfig.getPassword());
         config.setDriverClassName(dsConfig.getDriverClassName());
-        
+
         // Connection pool settings
         config.setMaximumPoolSize(dsConfig.getMaximumPoolSize());
         config.setMinimumIdle(dsConfig.getMinimumIdle());
         config.setConnectionTimeout(dsConfig.getConnectionTimeout());
         config.setIdleTimeout(dsConfig.getIdleTimeout());
         config.setMaxLifetime(dsConfig.getMaxLifetime());
-        
+
         // Pool name for monitoring
-        config.setPoolName("shard-" + shardConfig.getName());
-        
+        config.setPoolName(poolName);
+
         // Finance-grade settings
         config.setLeakDetectionThreshold(60000); // 1 minute
         config.setConnectionTestQuery("SELECT 1");
-        
+
         return new HikariDataSource(config);
     }
 }

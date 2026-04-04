@@ -25,7 +25,12 @@
         <module>sharding-core</module>
         <module>sharding-jdbc</module>
         <module>sharding-jpa</module>
+        <module>sharding-aop</module>
+        <module>sharding-metrics</module>
+        <module>sharding-readwrite</module>
         <module>sharding-autoconfigure</module>
+        <module>sharding-migration</module>
+        <module>sharding-cdc</module>
         <module>sharding-spring-boot-starter</module>
     </modules>
 

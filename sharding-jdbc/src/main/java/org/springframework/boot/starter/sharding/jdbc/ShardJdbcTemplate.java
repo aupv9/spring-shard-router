@@ -26,59 +26,59 @@ public class ShardJdbcTemplate {
     // UPDATE operations
     
     public int update(long shardKey, String sql, Object... args) {
-        return executeWithShardKey(shardKey, () -> jdbcTemplate.update(sql, args));
+        return executeWithShardKey(shardKey, "update", () -> jdbcTemplate.update(sql, args));
     }
-    
+
     public int[] batchUpdate(long shardKey, String sql, List<Object[]> batchArgs) {
-        return executeWithShardKey(shardKey, () -> 
+        return executeWithShardKey(shardKey, "batchUpdate", () ->
             jdbcTemplate.batchUpdate(sql, batchArgs));
     }
-    
+
     // QUERY operations
-    
+
     public <T> T queryForObject(long shardKey, String sql, Class<T> requiredType, Object... args) {
-        return executeWithShardKey(shardKey, () -> 
+        return executeWithShardKey(shardKey, "queryForObject", () ->
             jdbcTemplate.queryForObject(sql, requiredType, args));
     }
-    
+
     public <T> T queryForObject(long shardKey, String sql, RowMapper<T> rowMapper, Object... args) {
-        return executeWithShardKey(shardKey, () -> 
+        return executeWithShardKey(shardKey, "queryForObject", () ->
             jdbcTemplate.queryForObject(sql, rowMapper, args));
     }
-    
+
     public <T> List<T> query(long shardKey, String sql, RowMapper<T> rowMapper, Object... args) {
-        return executeWithShardKey(shardKey, () -> 
+        return executeWithShardKey(shardKey, "query", () ->
             jdbcTemplate.query(sql, rowMapper, args));
     }
-    
+
     public List<Map<String, Object>> queryForList(long shardKey, String sql, Object... args) {
-        return executeWithShardKey(shardKey, () -> 
+        return executeWithShardKey(shardKey, "queryForList", () ->
             jdbcTemplate.queryForList(sql, args));
     }
-    
+
     public Map<String, Object> queryForMap(long shardKey, String sql, Object... args) {
-        return executeWithShardKey(shardKey, () -> 
+        return executeWithShardKey(shardKey, "queryForMap", () ->
             jdbcTemplate.queryForMap(sql, args));
     }
-    
+
     public <T> T query(long shardKey, String sql, ResultSetExtractor<T> rse, Object... args) {
-        return executeWithShardKey(shardKey, () -> 
+        return executeWithShardKey(shardKey, "query", () ->
             jdbcTemplate.query(sql, rse, args));
     }
-    
+
     // EXECUTE operations
-    
+
     public <T> T execute(long shardKey, String sql, PreparedStatementCallback<T> action) {
-        return executeWithShardKey(shardKey, () -> 
+        return executeWithShardKey(shardKey, "execute", () ->
             jdbcTemplate.execute(sql, action));
     }
-    
-    // Core execution method with shard context management
-    
-    private <T> T executeWithShardKey(long shardKey, ShardOperation<T> operation) {
+
+    // Core execution method with shard context management — protected for subclass instrumentation
+
+    protected <T> T executeWithShardKey(long shardKey, String operation, ShardOperation<T> op) {
         try {
             ShardContext.set(shardKey);
-            return operation.execute();
+            return op.execute();
         } catch (DataAccessException e) {
             // Re-throw Spring's DataAccessException as-is
             throw e;
@@ -89,9 +89,9 @@ public class ShardJdbcTemplate {
             ShardContext.clear();
         }
     }
-    
+
     @FunctionalInterface
-    private interface ShardOperation<T> {
+    protected interface ShardOperation<T> {
         T execute() throws Exception;
     }
     

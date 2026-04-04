@@ -106,36 +106,112 @@ public class ShardProperties {
     }
     
     /**
+     * Read/write splitting settings.
+     * Enabled automatically when any shard has read-replicas configured.
+     */
+    private ReadWriteConfig readWriteSplitting = new ReadWriteConfig();
+
+    public ReadWriteConfig getReadWriteSplitting() {
+        return readWriteSplitting;
+    }
+
+    public void setReadWriteSplitting(ReadWriteConfig readWriteSplitting) {
+        this.readWriteSplitting = readWriteSplitting;
+    }
+
+    /**
+     * Dynamic shard management settings.
+     */
+    private ManagementConfig management = new ManagementConfig();
+
+    public ManagementConfig getManagement() {
+        return management;
+    }
+
+    public void setManagement(ManagementConfig management) {
+        this.management = management;
+    }
+
+    /**
      * Individual shard configuration
      */
     public static class ShardConfig {
-        
+
         /**
          * Shard name (for identification)
          */
         private String name;
-        
+
         /**
-         * DataSource configuration
+         * Primary DataSource configuration
          */
         private DataSourceConfig datasource;
-        
+
+        /**
+         * Optional read replica DataSource configurations.
+         * When present, read-only operations are routed to these replicas.
+         */
+        private List<DataSourceConfig> readReplicas = new ArrayList<>();
+
         // Getters and setters
-        
+
         public String getName() {
             return name;
         }
-        
+
         public void setName(String name) {
             this.name = name;
         }
-        
+
         public DataSourceConfig getDatasource() {
             return datasource;
         }
-        
+
         public void setDatasource(DataSourceConfig datasource) {
             this.datasource = datasource;
+        }
+
+        public List<DataSourceConfig> getReadReplicas() {
+            return readReplicas;
+        }
+
+        public void setReadReplicas(List<DataSourceConfig> readReplicas) {
+            this.readReplicas = readReplicas;
+        }
+    }
+
+    /**
+     * Read/write splitting configuration
+     */
+    public static class ReadWriteConfig {
+        /** Explicit toggle; also auto-activates when replicas are configured. */
+        private boolean enabled = false;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+    }
+
+    /**
+     * Dynamic shard management configuration
+     */
+    public static class ManagementConfig {
+        /**
+         * Expose the shard management Actuator endpoint.
+         * Off by default — enable only in controlled environments.
+         */
+        private boolean enabled = false;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
         }
     }
     

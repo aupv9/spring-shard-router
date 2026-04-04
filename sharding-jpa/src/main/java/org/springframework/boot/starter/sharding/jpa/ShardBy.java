@@ -9,7 +9,7 @@ import java.lang.annotation.Target;
  * Annotation to specify shard key field for automatic routing
  * Can be used on repository methods or service methods
  */
-@Target({ElementType.METHOD, ElementType.PARAMETER})
+@Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ShardBy {
     

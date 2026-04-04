@@ -16,6 +16,7 @@
     <description>Spring Boot auto-configuration for sharding</description>
 
     <dependencies>
+        <!-- Required -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>sharding-jdbc</artifactId>
@@ -39,9 +40,47 @@
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
         </dependency>
+
+        <!-- Optional: JPA support -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Optional: @ShardBy AOP -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>sharding-aop</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Optional: Micrometer metrics -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>sharding-metrics</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Optional: Read/write splitting -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>sharding-readwrite</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Optional: Actuator (shard management endpoint) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
             <optional>true</optional>
         </dependency>
     </dependencies>

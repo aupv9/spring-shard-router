@@ -6,3 +6,4 @@ org.springframework.boot.starter.sharding.autoconfigure.ShardingReadWriteAutoCon
 org.springframework.boot.starter.sharding.autoconfigure.ShardingManagementAutoConfiguration
 org.springframework.boot.starter.sharding.migration.ShardingMigrationAutoConfiguration
 org.springframework.boot.starter.sharding.cdc.ShardingCdcAutoConfiguration
+org.springframework.boot.starter.sharding.saga.ShardingSagaAutoConfiguration

@@ -32,6 +32,7 @@
         <module>sharding-migration</module>
         <module>sharding-cdc</module>
         <module>sharding-spring-boot-starter</module>
+        <module>sharding-saga</module>
     </modules>
 
     <dependencyManagement>

@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-04-06
+
+### Added — Phase 4: Production Hardening & Distributed Transactions
+
+#### Cross-Shard Saga Orchestration (sharding-saga — new module)
+- `ShardSagaStep<T>` — interface defining `execute(T)` + `compensate(T)` for one saga step
+- `ShardSagaDefinition<T>` — immutable ordered list of steps; built via fluent `builder()` API
+- `ShardSagaOrchestrator` — executes steps in order; on failure compensates completed steps in reverse; continues even if individual compensation steps throw
+- `ShardSagaLog` — immutable audit record (sagaId, stepName, Phase, Status, timestamp, errorMsg)
+- `ShardSagaException` — carries sagaId + full audit log; thrown after compensation completes
+- `ShardingSagaAutoConfiguration` — enabled via `sharding.saga.enabled=true`
+- Registered in `sharding-spring-boot-starter` auto-configuration imports
+
+#### Virtual Thread Executor (sharding-core)
+- `VirtualThreadShardExecutor` — factory producing an `ExecutorService` optimised per JVM:
+  - JDK 21+: `Executors.newVirtualThreadPerTaskExecutor()` via reflection (stays source-compatible with JDK 17)
+  - JDK 17–20: fallback to a cached daemon thread pool
+- `VirtualThreadShardExecutor.isVirtualThreadsAvailable()` — runtime JVM version check
+
+#### Test Coverage (filling Phase 2 & 3 gaps)
+- `ShardKeyExtractorTest` (sharding-aop) — all three extraction modes: first-long-param, named-param, entity-field; error paths for missing param/field
+- `MeteredShardRouterTest` (sharding-metrics) — counter increment, timer recording, multi-call accumulation, and delegation to underlying router
+- `ReadWriteRoutingDataSourceTest` (sharding-readwrite) — primary routing for writes, replica routing for reads, round-robin replica selection, no-replica fallback
+- `ShardMigrationServiceTest` (sharding-migration) — state machine transitions, key-range matching, invalid-input validation, getPlan/listPlans/getProgress queries
+- `ShardSagaOrchestratorTest` (sharding-saga) — all-steps-success, partial failure + compensation, first-step failure, full audit log assertions
+
 ## [3.0.0] - 2026-04-04
 
 ### Added — Phase 3

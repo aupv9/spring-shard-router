@@ -29,6 +29,8 @@
 | **Cross-shard paged queries** | ✅ v3.0 | `sharding-jdbc` |
 | **Online shard migration** (double-write + backfill) | ✅ v3.0 | `sharding-migration` |
 | **CDC integration** (Debezium / Kafka) | ✅ v3.0 | `sharding-cdc` |
+| **Cross-shard Saga transactions** (auto-compensation) | ✅ v4.0 | `sharding-saga` |
+| **Virtual thread executor** (JDK 21 Project Loom) | ✅ v4.0 | `sharding-core` |
 
 ---
 
@@ -80,6 +82,13 @@ Các module optional — thêm vào khi cần:
     <groupId>org.springframework.boot</groupId>
     <artifactId>sharding-cdc</artifactId>
     <version>2.0.0</version>
+</dependency>
+
+<!-- Cross-shard Saga transactions (v4.0) -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>sharding-saga</artifactId>
+    <version>4.0.0</version>
 </dependency>
 ```
 
@@ -510,6 +519,71 @@ public class MyCacheInvalidator extends ShardCacheInvalidator {
     protected void invalidate(ShardChangeEvent event) {
         cacheManager.getCache("scatter-gather-" + event.tableName()).clear();
     }
+}
+```
+
+---
+
+## Phase 4 — v4.0
+
+### Cross-Shard Saga Transactions
+
+Enable with `sharding.saga.enabled=true`.  A Saga breaks a cross-shard operation into
+ordered steps; if any step fails the orchestrator calls each previously-completed step's
+compensate method in reverse order.
+
+```java
+// 1. Define steps (typically Spring beans)
+ShardSagaDefinition<TransferContext> transferSaga =
+    ShardSagaDefinition.<TransferContext>builder()
+        .step(new DebitSourceStep(jdbcTemplate))
+        .step(new CreditTargetStep(jdbcTemplate))
+        .step(new RecordLedgerStep(jdbcTemplate))
+        .build();
+
+// 2. Execute (inject ShardSagaOrchestrator as a Spring bean)
+try {
+    orchestrator.execute(UUID.randomUUID().toString(), transferSaga, ctx);
+} catch (ShardSagaException ex) {
+    log.error("Transfer failed: {}", ex.getSagaId());
+    ex.getAuditLog().forEach(e -> log.error("  {} {} {}", e.phase(), e.stepName(), e.status()));
+}
+```
+
+Each step implements `ShardSagaStep<T>`:
+
+```java
+public class DebitSourceStep implements ShardSagaStep<TransferContext> {
+    @Override public String name() { return "debit-source"; }
+
+    @Override
+    public void execute(TransferContext ctx) {
+        // deduct from source shard — must be idempotent
+        jdbcTemplate.update(ctx.sourceShard(),
+            "UPDATE accounts SET balance = balance - ? WHERE id = ?",
+            ctx.amount(), ctx.sourceAccountId());
+        ctx.markDebited();
+    }
+
+    @Override
+    public void compensate(TransferContext ctx) {
+        // reverse the debit
+        jdbcTemplate.update(ctx.sourceShard(),
+            "UPDATE accounts SET balance = balance + ? WHERE id = ?",
+            ctx.amount(), ctx.sourceAccountId());
+    }
+}
+```
+
+### Virtual Thread Executor (JDK 21)
+
+```java
+// Create a virtual-thread executor for scatter-gather queries
+ExecutorService executor = VirtualThreadShardExecutor.create("shard-query");
+
+// Check at runtime whether virtual threads are available
+if (VirtualThreadShardExecutor.isVirtualThreadsAvailable()) {
+    log.info("Running on JDK 21+ with virtual threads");
 }
 ```
 

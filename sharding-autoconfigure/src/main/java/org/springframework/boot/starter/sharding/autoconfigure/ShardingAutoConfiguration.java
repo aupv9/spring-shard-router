@@ -3,19 +3,24 @@ package org.springframework.boot.starter.sharding.autoconfigure;
 import org.springframework.boot.starter.sharding.core.ConsistentHashShardRouter;
 import org.springframework.boot.starter.sharding.core.HashShardRouter;
 import org.springframework.boot.starter.sharding.core.Shard;
+import org.springframework.boot.starter.sharding.core.ShardContext;
 import org.springframework.boot.starter.sharding.core.ShardContextTaskDecorator;
 import org.springframework.boot.starter.sharding.core.ShardRouter;
+import org.springframework.boot.starter.sharding.jdbc.DefaultShardingClient;
 import org.springframework.boot.starter.sharding.jdbc.RoutingDataSource;
 import org.springframework.boot.starter.sharding.jdbc.ShardJdbcTemplate;
 import org.springframework.boot.starter.sharding.jdbc.ShardScatterGatherTemplate;
 import org.springframework.boot.starter.sharding.jdbc.ShardTransactionManager;
+import org.springframework.boot.starter.sharding.jdbc.ShardingClient;
 import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.task.TaskDecorator;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -96,6 +101,19 @@ public class ShardingAutoConfiguration {
     }
 
     /**
+     * Unified sharding facade — the single recommended entry point for application code.
+     * Wraps {@link ShardJdbcTemplate} (single-shard) and {@link ShardScatterGatherTemplate}
+     * (fan-out) behind a fluent, discoverable API.
+     */
+    @Bean
+    @ConditionalOnMissingBean(ShardingClient.class)
+    public ShardingClient shardingClient(ShardRouter shardRouter,
+                                          ShardJdbcTemplate shardJdbcTemplate,
+                                          ShardScatterGatherTemplate shardScatterGatherTemplate) {
+        return new DefaultShardingClient(shardRouter, shardJdbcTemplate, shardScatterGatherTemplate);
+    }
+
+    /**
      * TaskDecorator that propagates shard context into @Async threads.
      * Register this with your ThreadPoolTaskExecutor to enable shard-aware async.
      */
@@ -103,6 +121,20 @@ public class ShardingAutoConfiguration {
     @ConditionalOnMissingBean(TaskDecorator.class)
     public ShardContextTaskDecorator shardContextTaskDecorator() {
         return new ShardContextTaskDecorator();
+    }
+
+    /**
+     * Disables the shard-0 silent fallback once the application is fully started.
+     *
+     * <p>During startup, {@link RoutingDataSource} falls back to shard-0 when no shard key
+     * is set. This is required for Hibernate schema validation and HikariCP pool probing.
+     * Once {@link ApplicationReadyEvent} fires, the fallback is disabled so that any
+     * missing shard key throws {@link org.springframework.boot.starter.sharding.core.MissingShardKeyException}
+     * instead of silently routing to shard-0.
+     */
+    @Bean
+    public ApplicationListener<ApplicationReadyEvent> shardFallbackDisabler() {
+        return event -> ShardContext.disableFallback();
     }
     
     /**

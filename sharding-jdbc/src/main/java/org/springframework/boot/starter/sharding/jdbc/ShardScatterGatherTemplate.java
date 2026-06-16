@@ -14,6 +14,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -34,9 +36,18 @@ import java.util.stream.Collectors;
  *   <li>{@link #queryAllShardsPaged(String, RowMapper, Comparator, int, int, Object...)} — memory-efficient pagination</li>
  * </ul>
  *
+ * <p><b>Timeout support (Gap 5.3 fix):</b> every scatter operation accepts an optional
+ * {@link java.time.Duration} timeout. When all-shards operations use the no-timeout
+ * overload, the {@link #DEFAULT_SCATTER_TIMEOUT_SECONDS default timeout} of 30 seconds
+ * is applied so a single hung shard cannot block indefinitely. Pass
+ * {@code Duration.ZERO} to disable the timeout for a specific call.
+ *
  * <p>Thread safety: instances are stateless and safe to share.
  */
 public class ShardScatterGatherTemplate {
+
+    /** Default per-scatter timeout in seconds. Applied when no explicit timeout is given. */
+    public static final long DEFAULT_SCATTER_TIMEOUT_SECONDS = 30;
 
     private final List<JdbcTemplate> shardTemplates;
     private final ShardRouter shardRouter;
@@ -217,14 +228,30 @@ public class ShardScatterGatherTemplate {
 
     private <T> List<T> scatterTo(List<JdbcTemplate> templates,
                                    Function<JdbcTemplate, List<T>> operation) {
+        return scatterTo(templates, operation, DEFAULT_SCATTER_TIMEOUT_SECONDS);
+    }
+
+    private <T> List<T> scatterTo(List<JdbcTemplate> templates,
+                                   Function<JdbcTemplate, List<T>> operation,
+                                   long timeoutSeconds) {
         List<Callable<List<T>>> tasks = templates.stream()
             .<Callable<List<T>>>map(template -> () -> operation.apply(template))
             .toList();
 
         try {
-            List<Future<List<T>>> futures = executor.invokeAll(tasks);
+            List<Future<List<T>>> futures;
+            if (timeoutSeconds > 0) {
+                futures = executor.invokeAll(tasks, timeoutSeconds, TimeUnit.SECONDS);
+            } else {
+                futures = executor.invokeAll(tasks); // no timeout
+            }
             List<T> merged = new ArrayList<>();
             for (Future<List<T>> future : futures) {
+                if (future.isCancelled()) {
+                    throw new ShardScatterGatherException(
+                        "Scatter-gather timed out after " + timeoutSeconds + "s on one or more shards",
+                        new TimeoutException("Future cancelled due to scatter-gather timeout"));
+                }
                 merged.addAll(future.get());
             }
             return merged;
@@ -234,6 +261,17 @@ public class ShardScatterGatherTemplate {
         } catch (ExecutionException e) {
             throw new ShardScatterGatherException("Scatter-gather failed on one or more shards", e.getCause());
         }
+    }
+
+    /**
+     * Run a custom operation on every shard with an explicit timeout.
+     * Pass {@code 0} for {@code timeoutSeconds} to disable the timeout.
+     *
+     * @param operation     receives a {@link JdbcTemplate} per shard
+     * @param timeoutSeconds maximum seconds to wait for all shards; 0 = no limit
+     */
+    public <T> List<T> scatter(Function<JdbcTemplate, List<T>> operation, long timeoutSeconds) {
+        return scatterTo(shardTemplates, operation, timeoutSeconds);
     }
 
     public static class ShardScatterGatherException extends RuntimeException {

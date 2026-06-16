@@ -8,11 +8,28 @@ package org.springframework.boot.starter.sharding.core;
  * when {@code true}, {@code ReadWriteRoutingDataSource} routes to a read replica
  * instead of the primary. The flag integrates automatically with Spring's
  * {@code @Transactional(readOnly=true)}.
+ *
+ * <p>A process-wide {@code allowFallback} flag controls whether routing datasources
+ * are permitted to fall back to shard-0 when no shard key is set. During startup
+ * (schema validation, pool probing) this fallback is needed; during normal request
+ * processing it masks bugs where the caller forgot to set a shard key. Call
+ * {@link #disableFallback()} once the application context is fully started.
  */
 public class ShardContext {
 
     private static final ThreadLocal<Long>    SHARD_KEY = new ThreadLocal<>();
     private static final ThreadLocal<Boolean> READ_ONLY = new ThreadLocal<>();
+
+    /**
+     * When {@code true} (the default), routing datasources silently fall back to
+     * shard-0 when no shard key is in context. This is required during Spring Boot
+     * startup (Hibernate schema validation, HikariCP connection probing).
+     *
+     * <p>Set to {@code false} via {@link #disableFallback()} after the application
+     * context is fully started so that missing shard keys throw instead of silently
+     * routing to the wrong shard.
+     */
+    private static volatile boolean fallbackAllowed = true;
 
     // -------------------------------------------------------------------------
     // Shard key management
@@ -97,5 +114,39 @@ public class ShardContext {
      */
     public static void clearReadOnly() {
         READ_ONLY.remove();
+    }
+
+    // -------------------------------------------------------------------------
+    // Fallback control (startup vs. runtime safety)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns {@code true} if routing datasources may fall back to shard-0 when no
+     * shard key is set. Always {@code true} during startup; {@code false} after
+     * {@link #disableFallback()} is called.
+     */
+    public static boolean isFallbackAllowed() {
+        return fallbackAllowed;
+    }
+
+    /**
+     * Disable the shard-0 silent fallback. Call this once the application context
+     * is fully started (e.g. in an {@code ApplicationReadyEvent} listener registered
+     * by {@code ShardingAutoConfiguration}).
+     *
+     * <p>After this call, any {@code getConnection()} on a routing datasource with no
+     * shard key in context will throw {@link MissingShardKeyException} instead of
+     * silently routing to shard-0.
+     */
+    public static void disableFallback() {
+        fallbackAllowed = false;
+    }
+
+    /**
+     * Re-enable the shard-0 fallback. Primarily for use in tests that need to reset
+     * the flag between test cases.
+     */
+    public static void enableFallback() {
+        fallbackAllowed = true;
     }
 }

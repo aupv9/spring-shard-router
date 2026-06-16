@@ -1,5 +1,6 @@
 package org.springframework.boot.starter.sharding.readwrite;
 
+import org.springframework.boot.starter.sharding.core.MissingShardKeyException;
 import org.springframework.boot.starter.sharding.core.Shard;
 import org.springframework.boot.starter.sharding.core.ShardContext;
 import org.springframework.boot.starter.sharding.core.ShardRouter;
@@ -26,6 +27,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  * org.springframework.boot.starter.sharding.jdbc.RoutingDataSource}.
  *
  * <p>Replicas are load-balanced with a per-shard round-robin counter.
+ *
+ * <p>Like {@link org.springframework.boot.starter.sharding.jdbc.RoutingDataSource}, this
+ * class respects {@link ShardContext#isFallbackAllowed()}: it falls back to shard-0 during
+ * startup and throws {@link MissingShardKeyException} at runtime when no key is set.
  */
 public class ReadWriteRoutingDataSource extends AbstractDataSource {
 
@@ -54,8 +59,11 @@ public class ReadWriteRoutingDataSource extends AbstractDataSource {
     private DataSource getTargetDataSource() {
         Long shardKey = ShardContext.get();
         if (shardKey == null) {
-            // Fall back to shard-0 primary for schema validation / pool probing
-            return shardRouter.getShard(0).dataSource();
+            if (ShardContext.isFallbackAllowed()) {
+                // Startup phase: Hibernate validation / pool probing — safe to use shard-0
+                return shardRouter.getShard(0).dataSource();
+            }
+            throw new MissingShardKeyException();
         }
 
         Shard shard = shardRouter.resolve(shardKey);

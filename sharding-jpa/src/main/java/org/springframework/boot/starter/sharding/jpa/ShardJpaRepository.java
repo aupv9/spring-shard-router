@@ -138,13 +138,25 @@ public interface ShardJpaRepository<T, ID> extends JpaRepository<T, ID> {
     // Core execution method with shard context management
     
     default <R> R executeWithShardKey(long shardKey, ShardOperation<R> operation) {
+        // Save any shard key already set by an outer scope (e.g. a @Transactional service method).
+        // Restoring it in finally ensures the outer transaction keeps routing correctly after
+        // this repository call returns — without this, the first repo call inside a transaction
+        // would clear the context and break all subsequent operations in the same TX.
+        Long previous = ShardContext.get();
         try {
             ShardContext.set(shardKey);
             return operation.execute();
+        } catch (RuntimeException e) {
+            // Re-throw runtime exceptions (including DataAccessException) unchanged
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException("Shard repository operation failed for key: " + shardKey, e);
         } finally {
-            ShardContext.clear();
+            if (previous != null) {
+                ShardContext.set(previous);
+            } else {
+                ShardContext.clear();
+            }
         }
     }
     

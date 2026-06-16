@@ -55,13 +55,24 @@ public class ShardEntityManager {
     
     // Core execution method with shard context management
     private <T> T executeWithShardKey(long shardKey, ShardOperation<T> operation) {
+        // Save the outer shard key (if any) so we can restore it after this call.
+        // Critical for @Transactional methods that call multiple ShardEntityManager
+        // operations in sequence — each call must not clobber the others' context.
+        Long previous = ShardContext.get();
         try {
             ShardContext.set(shardKey);
             return operation.execute();
+        } catch (RuntimeException e) {
+            // Re-throw runtime exceptions (DataAccessException, etc.) unchanged
+            throw e;
         } catch (Exception e) {
-            throw new RuntimeException("Shard operation failed for key: " + shardKey, e);
+            throw new RuntimeException("Shard entity manager operation failed for key: " + shardKey, e);
         } finally {
-            ShardContext.clear();
+            if (previous != null) {
+                ShardContext.set(previous);
+            } else {
+                ShardContext.clear();
+            }
         }
     }
     

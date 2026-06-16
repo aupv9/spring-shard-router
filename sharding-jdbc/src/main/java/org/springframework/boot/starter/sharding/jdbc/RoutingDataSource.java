@@ -1,5 +1,6 @@
 package org.springframework.boot.starter.sharding.jdbc;
 
+import org.springframework.boot.starter.sharding.core.MissingShardKeyException;
 import org.springframework.boot.starter.sharding.core.Shard;
 import org.springframework.boot.starter.sharding.core.ShardContext;
 import org.springframework.boot.starter.sharding.core.ShardRouter;
@@ -32,16 +33,23 @@ public class RoutingDataSource extends AbstractDataSource {
     
     /**
      * Resolve target DataSource based on current shard context.
-     * Falls back to shard 0 when no shard key is set — this covers framework
-     * callbacks that run outside of a shard-aware operation (e.g. Hibernate schema
-     * validation during startup, connection metadata probing by the pool).
-     * Application code should always set a shard key via ShardJdbcTemplate or
-     * ShardContext before executing SQL.
+     *
+     * <p><b>Startup phase</b> ({@link ShardContext#isFallbackAllowed()} == {@code true}):
+     * falls back to shard-0 when no key is set. This covers Hibernate schema
+     * validation and HikariCP pool probing that run before any request is served.
+     *
+     * <p><b>Runtime phase</b> ({@link ShardContext#isFallbackAllowed()} == {@code false}):
+     * throws {@link MissingShardKeyException} when no key is set. This surfaces bugs
+     * where application code forgot to route to a shard, preventing silent data
+     * corruption from unkeyed writes landing on shard-0.
      */
     private javax.sql.DataSource getTargetDataSource() {
         Long shardKey = ShardContext.get();
         if (shardKey == null) {
-            return shardRouter.getShard(0).dataSource();
+            if (ShardContext.isFallbackAllowed()) {
+                return shardRouter.getShard(0).dataSource();
+            }
+            throw new MissingShardKeyException();
         }
 
         Shard shard = shardRouter.resolve(shardKey);

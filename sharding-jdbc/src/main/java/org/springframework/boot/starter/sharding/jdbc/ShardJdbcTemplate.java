@@ -76,17 +76,26 @@ public class ShardJdbcTemplate {
     // Core execution method with shard context management — protected for subclass instrumentation
 
     protected <T> T executeWithShardKey(long shardKey, String operation, ShardOperation<T> op) {
+        // Save any shard key already set by an outer scope (e.g. a @Transactional method that
+        // called ShardContext.set before delegating here). We restore it in the finally block
+        // so the outer transaction keeps routing to the correct shard after this call returns.
+        Long previous = ShardContext.get();
         try {
             ShardContext.set(shardKey);
             return op.execute();
         } catch (DataAccessException e) {
-            // Re-throw Spring's DataAccessException as-is
+            // Re-throw Spring's DataAccessException as-is — preserve the exception hierarchy
             throw e;
         } catch (Exception e) {
-            // Wrap other exceptions
+            // Wrap any other exception in DataAccessException so callers get a consistent type
             throw new DataAccessException("Shard operation failed for key: " + shardKey, e) {};
         } finally {
-            ShardContext.clear();
+            // Restore the previous key (or clear if there was none)
+            if (previous != null) {
+                ShardContext.set(previous);
+            } else {
+                ShardContext.clear();
+            }
         }
     }
 

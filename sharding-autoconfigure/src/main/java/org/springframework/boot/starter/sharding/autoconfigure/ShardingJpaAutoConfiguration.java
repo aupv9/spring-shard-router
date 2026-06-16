@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.orm.jpa.JpaProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.starter.sharding.jpa.ShardEntityManager;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.ApplicationContext;
 import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.support.SharedEntityManagerCreator;
@@ -39,17 +40,19 @@ public class ShardingJpaAutoConfiguration {
     public LocalContainerEntityManagerFactoryBean shardingEntityManagerFactory(
             DataSource shardingDataSource,
             ShardProperties shardProperties,
-            JpaProperties jpaProperties) {
+            JpaProperties jpaProperties,
+            ApplicationContext applicationContext) {
 
         LocalContainerEntityManagerFactoryBean factory = new LocalContainerEntityManagerFactoryBean();
         factory.setDataSource(shardingDataSource);
 
         List<String> packages = shardProperties.getEntityPackages();
         if (packages.isEmpty()) {
-            throw new IllegalStateException(
-                "sharding.entity-packages must be configured. " +
-                "Example: sharding.entity-packages=com.example.domain"
-            );
+            // Gap 5.4 fix: fall back to the main application's base package
+            // instead of throwing. Spring Boot determines the base package from
+            // the @SpringBootApplication class registered in the ApplicationContext.
+            String basePackage = deduceBasePackage(applicationContext);
+            packages = List.of(basePackage);
         }
         factory.setPackagesToScan(packages.toArray(String[]::new));
         
@@ -100,5 +103,43 @@ public class ShardingJpaAutoConfiguration {
     public ShardEntityManager shardEntityManager(EntityManagerFactory shardingEntityManagerFactory) {
         EntityManager sharedEm = SharedEntityManagerCreator.createSharedEntityManager(shardingEntityManagerFactory);
         return new ShardEntityManager(sharedEm);
+    }
+
+    // -------------------------------------------------------------------------
+    // Internal helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Deduce the base package for entity scanning from the Spring Boot application class.
+     *
+     * <p>Spring Boot registers a {@code org.springframework.boot.autoconfigure.SpringBootApplication}
+     * annotated class. Its package is the canonical base package — the same one Spring Boot
+     * uses for component scanning by default.
+     *
+     * <p>Falls back to {@code ""} (scan everything) if no suitable class can be found,
+     * which is safe but slower at startup.
+     */
+    private String deduceBasePackage(ApplicationContext applicationContext) {
+        try {
+            // Spring Boot sets the main application class as an attribute of the context
+            Class<?> mainClass = (Class<?>) applicationContext
+                .getBean(org.springframework.boot.autoconfigure.SpringBootApplication.class
+                    .getName() + ".class");
+            return mainClass.getPackage().getName();
+        } catch (Exception ignored) {
+            // Fallback: inspect beans for @SpringBootApplication
+        }
+        // Secondary fallback: find any @SpringBootApplication bean and use its package
+        try {
+            String[] beanNames = applicationContext
+                .getBeanNamesForAnnotation(org.springframework.boot.autoconfigure.SpringBootApplication.class);
+            if (beanNames.length > 0) {
+                return applicationContext.getBean(beanNames[0]).getClass().getPackage().getName();
+            }
+        } catch (Exception ignored) {
+            // ignored
+        }
+        // Last resort: scan everything — safe but slower
+        return "";
     }
 }

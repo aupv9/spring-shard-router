@@ -4,7 +4,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.starter.sharding.core.Shard;
 import org.springframework.boot.starter.sharding.core.ShardRouter;
-import org.springframework.boot.starter.sharding.jdbc.ShardJdbcTemplate;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -15,16 +14,14 @@ import static org.mockito.Mockito.*;
 class ShardMigrationServiceTest {
 
     private ShardRouter shardRouter;
-    private ShardJdbcTemplate jdbcTemplate;
     private ShardMigrationService service;
 
     @BeforeEach
     void setUp() {
         shardRouter  = mock(ShardRouter.class);
-        jdbcTemplate = mock(ShardJdbcTemplate.class);
         when(shardRouter.getShardCount()).thenReturn(3);
 
-        service = new ShardMigrationService(shardRouter, jdbcTemplate);
+        service = new ShardMigrationService(shardRouter);
     }
 
     // -------------------------------------------------------------------------

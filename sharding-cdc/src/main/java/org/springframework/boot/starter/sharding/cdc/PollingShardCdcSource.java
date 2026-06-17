@@ -58,12 +58,7 @@ public class PollingShardCdcSource implements ShardCdcSource {
 
     private Instant lastPollTime = Instant.EPOCH;
 
-    private final ScheduledExecutorService scheduler =
-        Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "shard-cdc-poll-" + shardIndex);
-            t.setDaemon(true);
-            return t;
-        });
+    private final ScheduledExecutorService scheduler;
 
     private ScheduledFuture<?> pollTask;
 
@@ -73,6 +68,11 @@ public class PollingShardCdcSource implements ShardCdcSource {
         this.table               = b.table;
         this.shardKeyColumn      = b.shardKeyColumn;
         this.pollIntervalSeconds = b.pollIntervalSeconds > 0 ? b.pollIntervalSeconds : 5;
+        this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "shard-cdc-poll-" + shardIndex);
+            t.setDaemon(true);
+            return t;
+        });
     }
 
     // -------------------------------------------------------------------------

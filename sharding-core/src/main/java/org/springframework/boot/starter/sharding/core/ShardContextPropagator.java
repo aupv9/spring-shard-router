@@ -32,26 +32,33 @@ public final class ShardContextPropagator {
     public static <T> Supplier<T> wrap(Supplier<T> supplier) {
         Long shardKey = ShardContext.get();
         return () -> {
+            Long previous = ShardContext.get();
             try {
-                if (shardKey != null) ShardContext.set(shardKey);
+                applyKey(shardKey);
                 return supplier.get();
             } finally {
-                ShardContext.clear();
+                restoreKey(previous);
             }
         };
     }
 
     /**
      * Wrap a {@link Callable} so it runs with the current shard context.
+     *
+     * <p>Named distinctly from {@link #wrap(Supplier)} because a bare lambda
+     * ({@code () -> value}) is assignment-compatible with both {@code Supplier}
+     * and {@code Callable}, which would make an overloaded {@code wrap} ambiguous
+     * at the call site.
      */
-    public static <T> Callable<T> wrap(Callable<T> callable) {
+    public static <T> Callable<T> wrapCallable(Callable<T> callable) {
         Long shardKey = ShardContext.get();
         return () -> {
+            Long previous = ShardContext.get();
             try {
-                if (shardKey != null) ShardContext.set(shardKey);
+                applyKey(shardKey);
                 return callable.call();
             } finally {
-                ShardContext.clear();
+                restoreKey(previous);
             }
         };
     }
@@ -62,13 +69,39 @@ public final class ShardContextPropagator {
     public static Runnable wrap(Runnable runnable) {
         Long shardKey = ShardContext.get();
         return () -> {
+            Long previous = ShardContext.get();
             try {
-                if (shardKey != null) ShardContext.set(shardKey);
+                applyKey(shardKey);
                 runnable.run();
             } finally {
-                ShardContext.clear();
+                restoreKey(previous);
             }
         };
+    }
+
+    /** Set the captured shard key for the worker, or clear it if none was captured. */
+    private static void applyKey(Long shardKey) {
+        if (shardKey != null) {
+            ShardContext.set(shardKey);
+        } else {
+            ShardContext.clear();
+        }
+    }
+
+    /**
+     * Restore the shard key that was present before the wrapped task ran.
+     *
+     * <p>Saving and restoring (rather than unconditionally clearing) keeps the
+     * propagator correct when the task runs on a thread that already carried a
+     * shard context — e.g. a same-thread/direct executor — instead of wiping the
+     * caller's context.
+     */
+    private static void restoreKey(Long previous) {
+        if (previous != null) {
+            ShardContext.set(previous);
+        } else {
+            ShardContext.clear();
+        }
     }
 
     /**

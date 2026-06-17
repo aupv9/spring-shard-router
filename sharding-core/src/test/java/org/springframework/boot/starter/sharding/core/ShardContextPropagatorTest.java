@@ -67,7 +67,7 @@ class ShardContextPropagatorTest {
     @Test
     void shouldWrapCallableWithShardContext() throws Exception {
         ShardContext.set(50L);
-        var wrapped = ShardContextPropagator.wrap(() -> ShardContext.get());
+        var wrapped = ShardContextPropagator.wrapCallable(() -> ShardContext.get());
         AtomicReference<Long> result = new AtomicReference<>();
         Thread t = new Thread(() -> {
             try { result.set(wrapped.call()); } catch (Exception e) { fail(e); }

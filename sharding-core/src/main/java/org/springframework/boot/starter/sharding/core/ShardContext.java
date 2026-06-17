@@ -44,6 +44,21 @@ public class ShardContext {
     }
 
     /**
+     * Set an arbitrary shard key object for the current thread (e.g. {@code String}
+     * tenant id, {@link java.util.UUID}, composite key built via {@link ShardKeys}).
+     *
+     * <p>The value is normalised to a {@code long} via {@link ShardKeyConverter#DEFAULT}
+     * and stored, so all downstream {@code long}-based routing (routing datasource,
+     * JDBC template) works unchanged.
+     *
+     * @param key the shard key; must not be {@code null}
+     * @throws IllegalArgumentException if {@code key} is {@code null} or cannot be converted
+     */
+    public static void setKey(Object key) {
+        SHARD_KEY.set(ShardKeyConverter.DEFAULT.toLong(key));
+    }
+
+    /**
      * Get shard key for current thread.
      * @return shard key or null if not set
      */

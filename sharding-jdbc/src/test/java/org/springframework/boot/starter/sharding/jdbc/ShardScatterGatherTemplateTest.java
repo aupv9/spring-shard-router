@@ -69,7 +69,7 @@ class ShardScatterGatherTemplateTest {
 
     @Test
     void shouldMergeAndSortResultsGlobally() {
-        List<String> sorted = template.queryAllShardsSorted(
+        List<String> sorted = template.<String>queryAllShardsSorted(
             "SELECT value FROM items",
             (rs, row) -> rs.getString("value"),
             Comparator.naturalOrder()
@@ -81,7 +81,7 @@ class ShardScatterGatherTemplateTest {
 
     @Test
     void shouldReturnTopNResultsAfterGlobalSort() {
-        List<String> top2 = template.queryAllShardsTopN(
+        List<String> top2 = template.<String>queryAllShardsTopN(
             "SELECT value FROM items",
             (rs, row) -> rs.getString("value"),
             Comparator.naturalOrder(),
@@ -143,7 +143,9 @@ class ShardScatterGatherTemplateTest {
     private static DataSource h2DataSource(String dbName) {
         DriverManagerDataSource ds = new DriverManagerDataSource();
         ds.setDriverClassName("org.h2.Driver");
-        ds.setUrl("jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE");
+        // NON_KEYWORDS=VALUE: 'value' is a reserved word in modern H2; the test
+        // schema uses it as a column name, so exclude it from the keyword list.
+        ds.setUrl("jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;NON_KEYWORDS=VALUE");
         ds.setUsername("sa");
         ds.setPassword("");
         return ds;

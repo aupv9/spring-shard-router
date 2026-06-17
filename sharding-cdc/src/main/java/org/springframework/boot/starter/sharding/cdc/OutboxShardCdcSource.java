@@ -66,12 +66,7 @@ public class OutboxShardCdcSource implements ShardCdcSource {
     private final int          batchSize;
     private final long         pollIntervalSeconds;
 
-    private final ScheduledExecutorService scheduler =
-        Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "shard-cdc-outbox-" + shardIndex);
-            t.setDaemon(true);
-            return t;
-        });
+    private final ScheduledExecutorService scheduler;
 
     private ScheduledFuture<?> pollTask;
 
@@ -81,6 +76,11 @@ public class OutboxShardCdcSource implements ShardCdcSource {
         this.outboxTable         = b.outboxTable;
         this.batchSize           = b.batchSize > 0 ? b.batchSize : 100;
         this.pollIntervalSeconds = b.pollIntervalSeconds > 0 ? b.pollIntervalSeconds : 2;
+        this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "shard-cdc-outbox-" + shardIndex);
+            t.setDaemon(true);
+            return t;
+        });
     }
 
     // -------------------------------------------------------------------------

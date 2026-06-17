@@ -46,7 +46,18 @@
             <artifactId>sharding-spring-boot-starter</artifactId>
             <version>1.0.0</version>
         </dependency>
-        
+        <!-- Metrics module: starter declares it optional, so depend on it
+             directly — the integration tests reference MeteredShardRouter. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>sharding-metrics</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+        </dependency>
+
         <!-- Spring Boot -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

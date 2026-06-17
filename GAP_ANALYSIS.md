@@ -143,6 +143,42 @@ cần shared store + coordination để các thao tác topology/migration nhất
 
 ---
 
+## Tiến độ triển khai
+
+### ✅ Đã làm (đợt 1)
+
+- **Build health (điều kiện tiên quyết):** toàn bộ reactor ở HEAD vốn không compile/test
+  được. Đã khắc phục để `mvn clean test` xanh trên cả 11 module:
+  - `sharding-readwrite`: `spring-jdbc` sai groupId (`org.springframework.boot` → `org.springframework`).
+  - `sharding-core`: thiếu `assertj-core` (test); `ShardContextPropagator.wrap` nhập nhằng
+    overload `Supplier`/`Callable` (tách thành `wrap`/`wrapCallable`).
+  - `sharding-jdbc`: type-inference test scatter-gather; `value` là reserved word trong H2
+    (thêm `NON_KEYWORDS=VALUE`).
+  - parent `pom.xml`: bật `-parameters` cho compiler (cần cho `@ShardBy("name")`).
+  - `sharding-metrics`: thiếu `spring-boot-actuator`.
+  - `sharding-autoconfigure`: import sai `SharedEntityManagerCreator`; `JpaProperties.getHibernate()`
+    đã bị bỏ ở Spring Boot 3.x (chuyển sang `HibernateProperties`).
+  - `sharding-migration`: file `ShardMigrationService` bị nhân đôi class (leftover merge).
+  - `sharding-cdc`: thiếu `spring-jdbc` + `jakarta.annotation-api`; field initializer dùng
+    `shardIndex` trước khi gán (chuyển vào constructor).
+  - `sharding-saga`: thiếu `slf4j-api`.
+
+- **Gap #1 — Generic shard key (một phần):** thêm SPI `ShardKeyConverter` +
+  `DefaultShardKeyConverter` (Number/UUID/String/byte[]/Object→`long` ổn định), helper
+  `ShardKeys.composite(...)`, `ShardRouter.resolve(Object)` và `ShardContext.setKey(Object)`.
+  Key bất kỳ được chuẩn hoá về `long` nên toàn bộ pipeline `long` hiện có (RoutingDataSource,
+  ShardJdbcTemplate) chạy không đổi. Có test cho converter, composite key và routing
+  end-to-end.
+
+- **Gap #8 (một phần):** `ShardContextPropagator` nay lưu/khôi phục shard key thay vì
+  `clear()` mù — không còn xoá nhầm context của caller khi chạy trên same-thread executor.
+
+### ⏳ Còn lại
+
+Gap #1 (mức JDBC/JPA template Object-overload, override map non-long), #2 (đồng bộ topology
+đa node), #3 (ShardStrategy SPI + range/directory), #4 (resilience/failover), #5 (siết
+fallback), #6 (broadcast/binding/ID), #7 (shared state), #8 (reactive), #9 (secrets).
+
 ## Đề xuất lộ trình
 
 1. **Generic shard key** (gap #1) — nền tảng, mở khoá multi-tenant & string/uuid sharding.

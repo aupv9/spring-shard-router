@@ -4,6 +4,7 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.orm.jpa.HibernateProperties;
 import org.springframework.boot.autoconfigure.orm.jpa.JpaProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.starter.sharding.jpa.ShardEntityManager;
@@ -11,7 +12,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
-import org.springframework.orm.jpa.support.SharedEntityManagerCreator;
+import org.springframework.orm.jpa.SharedEntityManagerCreator;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -29,7 +30,7 @@ import java.util.Map;
 @AutoConfiguration
 @ConditionalOnClass({EntityManager.class, LocalContainerEntityManagerFactoryBean.class})
 @ConditionalOnProperty(name = "sharding.enabled", havingValue = "true")
-@EnableConfigurationProperties({ShardProperties.class, JpaProperties.class})
+@EnableConfigurationProperties({ShardProperties.class, JpaProperties.class, HibernateProperties.class})
 public class ShardingJpaAutoConfiguration {
     
     /**
@@ -41,6 +42,7 @@ public class ShardingJpaAutoConfiguration {
             DataSource shardingDataSource,
             ShardProperties shardProperties,
             JpaProperties jpaProperties,
+            HibernateProperties hibernateProperties,
             ApplicationContext applicationContext) {
 
         LocalContainerEntityManagerFactoryBean factory = new LocalContainerEntityManagerFactoryBean();
@@ -69,7 +71,7 @@ public class ShardingJpaAutoConfiguration {
         // database must be managed independently — Hibernate can only see one shard at a
         // time via the RoutingDataSource, so it cannot create or validate all shards.
         if (!jpaPropertiesMap.containsKey("hibernate.hbm2ddl.auto")) {
-            String ddlAuto = jpaProperties.getHibernate().getDdlAuto();
+            String ddlAuto = hibernateProperties.getDdlAuto();
             jpaPropertiesMap.put("hibernate.hbm2ddl.auto", ddlAuto != null ? ddlAuto : "none");
         }
 

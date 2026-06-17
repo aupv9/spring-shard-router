@@ -20,6 +20,22 @@ public interface ShardRouter {
     Shard resolve(long shardKey);
 
     /**
+     * Resolve an arbitrary shard key object (e.g. {@code String} tenant id,
+     * {@link java.util.UUID}, composite key) to its target shard.
+     *
+     * <p>The key is normalised to a {@code long} via {@link ShardKeyConverter#DEFAULT}
+     * and then routed through {@link #resolve(long)}. This lets the same router
+     * shard by non-numeric keys without changing the underlying routing strategy.
+     *
+     * @param shardKey the key to route; must not be {@code null}
+     * @return target shard
+     * @throws IllegalArgumentException if {@code shardKey} is {@code null} or cannot be converted
+     */
+    default Shard resolve(Object shardKey) {
+        return resolve(ShardKeyConverter.DEFAULT.toLong(shardKey));
+    }
+
+    /**
      * Get total number of shards.
      * @return shard count
      */

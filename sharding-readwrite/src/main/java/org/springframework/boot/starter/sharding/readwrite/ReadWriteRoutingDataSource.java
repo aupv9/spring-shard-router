@@ -66,7 +66,9 @@ public class ReadWriteRoutingDataSource extends AbstractDataSource {
             throw new MissingShardKeyException();
         }
 
-        Shard shard = shardRouter.resolve(shardKey);
+        // Call the primitive resolve(long) explicitly: passing the boxed Long would
+        // bind to the default resolve(Object) overload instead.
+        Shard shard = shardRouter.resolve(shardKey.longValue());
 
         if (isReadOperation() && shard.hasReadReplicas()) {
             return selectReplica(shard);
